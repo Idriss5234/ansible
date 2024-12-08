@@ -1,0 +1,76 @@
+---
+- name: create user
+  hosts: all
+  vars_files:
+    - project_vars
+  become: true
+  tasks:
+ #   - name: Display variables
+  #    debug:
+   #     msg: "User: {{ user }}, Password: {{ password }}, Source: {{ source }}, Dest: {{ dest }}"
+    - name: add user
+      user:
+        name: "{{ user }}"
+        password: "{{ password }}"
+        groups: root
+        append: yes
+    - name: reconnect
+      meta: reset_connection
+
+- name: install node and npm
+  hosts: all
+  become: true
+  tasks:
+    - name: update cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+    - name: install nodejs
+      apt:
+        pkg:
+          - nodejs
+          - npm
+
+- name: copy and untar
+  hosts: all
+  vars_files:
+    - project_vars
+  become: True
+  tasks:
+    - name: ensure unzip is installed
+      apt:
+        name: unzip
+        state: present
+    - name: copy and untar
+      unarchive:
+        src: "{{ source }}"
+        dest: "{{ dest }}"
+        remote_src: no
+
+
+- name: dep and start
+  hosts: all
+  vars_files:
+    - project_vars
+  become: true
+  tasks:
+      - name: install dep
+        npm:
+          path: "{{dest}}/RoboFriends"
+      - name: start app
+        command:
+          chdir: "{{ dest }}/RoboFriends"
+          cmd: npm run start
+        async: 1000
+        poll: 0
+
+- name: make sure app running
+  hosts: all
+  become_user: idriss
+  tasks:
+    - name: check if app is running
+      shell: ps aux | grep npm
+      register: app_status
+
+    - debug:
+        msg: "{{ app_status.stdout_lines }}"
